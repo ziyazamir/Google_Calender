@@ -8,6 +8,8 @@ use Google_Service_Calendar;
 use Google_Service_Calendar_Event;
 use Google_Service_Calendar_EventDateTime;
 use Illuminate\Http\Request;
+use stdClass;
+
 // use Illuminate\Http\Request;
 
 class GoogleCalenderController extends Controller
@@ -34,14 +36,19 @@ class GoogleCalenderController extends Controller
     {
         session_start();
         if (isset($_SESSION['access_token']) && $_SESSION['access_token']) {
+            // print_r($_SESSION['access_token']);
+            // die();
             $this->client->setAccessToken($_SESSION['access_token']);
             $service = new Google_Service_Calendar($this->client);
 
             $calendarId = 'primary';
 
             $results = $service->events->listEvents($calendarId);
-            $event = $results->getItems();
-            return view('index', ['events' => $event]);
+            // die($results);
+            $event = array_reverse($results->getItems());
+            $data = new stdClass;
+            $data->data = "hello";
+            return view('index', ['events' => json_encode($event)]);
         } else {
             return redirect()->route('oauthCallback');
         }
@@ -73,7 +80,7 @@ class GoogleCalenderController extends Controller
      */
     public function create()
     {
-        return view('calendar.createEvent');
+        // return view('');
     }
 
     /**
@@ -92,19 +99,41 @@ class GoogleCalenderController extends Controller
             $this->client->setAccessToken($_SESSION['access_token']);
             $service = new Google_Service_Calendar($this->client);
 
-            $calendarId = 'primary';
-            $event = new Google_Service_Calendar_Event([
+            $event = new Google_Service_Calendar_Event(array(
                 'summary' => $request->title,
+                'location' => '800 Howard St., San Francisco, CA 94103',
                 'description' => $request->description,
-                'start' => ['dateTime' => $startDateTime],
-                'end' => ['dateTime' => $endDateTime],
-                'reminders' => ['useDefault' => true],
-            ]);
-            $results = $service->events->insert($calendarId, $event);
-            if (!$results) {
+                'start' => array(
+                    'date' => $startDateTime,
+                    'timeZone' => 'America/Los_Angeles',
+                ),
+                'end' => array(
+                    'date' => $endDateTime,
+                    'timeZone' => 'America/Los_Angeles',
+                ),
+                'recurrence' => array(
+                    'RRULE:FREQ=DAILY;COUNT=2'
+                ),
+                'attendees' => array(
+                    array('email' => 'lpage@example.com'),
+                    array('email' => 'sbrin@example.com'),
+                ),
+                'reminders' => array(
+                    'useDefault' => FALSE,
+                    'overrides' => array(
+                        array('method' => 'email', 'minutes' => 24 * 60),
+                        array('method' => 'popup', 'minutes' => 10),
+                    ),
+                ),
+            ));
+
+            $calendarId = 'primary';
+            $event = $service->events->insert($calendarId, $event);
+            printf('Event created: %s\n', $event->htmlLink);
+            if (!$event) {
                 return response()->json(['status' => 'error', 'message' => 'Something went wrong']);
             }
-            return response()->json(['status' => 'success', 'message' => 'Event Created']);
+            return redirect()->route('index')->with('success', "created succesfully");
         } else {
             return redirect()->route('oauthCallback');
         }
@@ -119,20 +148,7 @@ class GoogleCalenderController extends Controller
      */
     public function show($eventId)
     {
-        session_start();
-        if (isset($_SESSION['access_token']) && $_SESSION['access_token']) {
-            $this->client->setAccessToken($_SESSION['access_token']);
-
-            $service = new Google_Service_Calendar($this->client);
-            $event = $service->events->get('primary', $eventId);
-
-            if (!$event) {
-                return response()->json(['status' => 'error', 'message' => 'Something went wrong']);
-            }
-            return response()->json(['status' => 'success', 'data' => $event]);
-        } else {
-            return redirect()->route('oauthCallback');
-        }
+        return null;
     }
 
     /**
@@ -156,48 +172,7 @@ class GoogleCalenderController extends Controller
      */
     public function update(Request $request, $eventId)
     {
-        session_start();
-        if (isset($_SESSION['access_token']) && $_SESSION['access_token']) {
-            $this->client->setAccessToken($_SESSION['access_token']);
-            $service = new Google_Service_Calendar($this->client);
-
-            $startDateTime = Carbon::parse($request->start_date)->toRfc3339String();
-
-            $eventDuration = 30; //minutes
-
-            if ($request->has('end_date')) {
-                $endDateTime = Carbon::parse($request->end_date)->toRfc3339String();
-            } else {
-                $endDateTime = Carbon::parse($request->start_date)->addMinutes($eventDuration)->toRfc3339String();
-            }
-
-            // retrieve the event from the API.
-            $event = $service->events->get('primary', $eventId);
-
-            $event->setSummary($request->title);
-
-            $event->setDescription($request->description);
-
-            //start time
-            $start = new Google_Service_Calendar_EventDateTime();
-            $start->setDateTime($startDateTime);
-            $event->setStart($start);
-
-            //end time
-            $end = new Google_Service_Calendar_EventDateTime();
-            $end->setDateTime($endDateTime);
-            $event->setEnd($end);
-
-            $updatedEvent = $service->events->update('primary', $event->getId(), $event);
-
-
-            if (!$updatedEvent) {
-                return response()->json(['status' => 'error', 'message' => 'Something went wrong']);
-            }
-            return response()->json(['status' => 'success', 'data' => $updatedEvent]);
-        } else {
-            return redirect()->route('oauthCallback');
-        }
+        // update 
     }
 
     /**
@@ -207,14 +182,19 @@ class GoogleCalenderController extends Controller
      * @return \Illuminate\Http\Response
      * @internal param int $id
      */
-    public function destroy($eventId)
+    public function destroy($id)
     {
         session_start();
+        // echo $id;
+        // die();
         if (isset($_SESSION['access_token']) && $_SESSION['access_token']) {
             $this->client->setAccessToken($_SESSION['access_token']);
             $service = new Google_Service_Calendar($this->client);
 
-            $service->events->delete('primary', $eventId);
+            $service->events->delete('primary', $id);
+            return redirect()->route('index')->with('delete', "deleted succesfully");
+            // echo $result;
+            die();
         } else {
             return redirect()->route('oauthCallback');
         }
@@ -224,7 +204,8 @@ class GoogleCalenderController extends Controller
     {
         session_start();
         session_destroy();
-        echo "destroyed";
+        // echo "destroyed";
+        return redirect('/');
         // echo $_SESSION['access_token'];
     }
 }

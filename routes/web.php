@@ -22,3 +22,5 @@ Route::get('/', function () {
 Route::get('/oauth', [GoogleCalenderController::class, 'oauth'])->name('oauthCallback');
 Route::get('/index', [GoogleCalenderController::class, 'index'])->name('index');
 Route::get('/logout', [GoogleCalenderController::class, 'logout'])->name('logout');
+Route::post('/create', [GoogleCalenderController::class, 'store'])->name('create');
+Route::get('/destroy/{id}', [GoogleCalenderController::class, 'destroy'])->name('destroy');
