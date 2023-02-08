@@ -40,7 +40,8 @@ class GoogleCalenderController extends Controller
             $calendarId = 'primary';
 
             $results = $service->events->listEvents($calendarId);
-            return $results->getItems();
+            $event = $results->getItems();
+            return view('index', ['events' => $event]);
         } else {
             return redirect()->route('oauthCallback');
         }
@@ -50,16 +51,18 @@ class GoogleCalenderController extends Controller
     {
         session_start();
 
-        $rurl = action('gCalendarController@oauth');
+        $rurl = action([GoogleCalenderController::class, 'oauth']);
+        // die($rurl);
         $this->client->setRedirectUri($rurl);
         if (!isset($_GET['code'])) {
             $auth_url = $this->client->createAuthUrl();
             $filtered_url = filter_var($auth_url, FILTER_SANITIZE_URL);
             return redirect($filtered_url);
         } else {
-            $this->client->authenticate($_GET['code']);
+            $this->client->fetchAccessTokenWithAuthCode($_GET['code']);
             $_SESSION['access_token'] = $this->client->getAccessToken();
-            return redirect()->route('cal.index');
+            echo "helllo";
+            return redirect()->route('index');
         }
     }
 
@@ -215,5 +218,13 @@ class GoogleCalenderController extends Controller
         } else {
             return redirect()->route('oauthCallback');
         }
+    }
+
+    public function logout()
+    {
+        session_start();
+        session_destroy();
+        echo "destroyed";
+        // echo $_SESSION['access_token'];
     }
 }
